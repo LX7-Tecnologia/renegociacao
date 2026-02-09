@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: renegociacao-boletos-ixc
+    name: renegociacao
     runtime: node
     buildCommand: pnpm build
     startCommand: pnpm run start
