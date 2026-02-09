@@ -43,9 +43,6 @@ export class IxcService {
     }
   }
 
-  /**
-   * Busca boletos pagos em uma data específica
-   */
   async buscarBoletosPagosNaData(data: string): Promise<Boleto[]> {
     try {
       const response = await this.client.post<BoletosPaginados>('/fn_areceber', {
@@ -71,9 +68,6 @@ export class IxcService {
     }
   }
 
-  /**
-   * Busca todos os boletos de um contrato
-   */
   async buscarBoletosPorContrato(
     idContrato?: string,
     idContratoAvulso?: string
@@ -97,7 +91,6 @@ export class IxcService {
         });
       }
 
-      // Adiciona filtro para status aberto
       filtros.push({
         TB: 'fn_areceber.status',
         OP: '=',
@@ -124,15 +117,11 @@ export class IxcService {
     }
   }
 
-  /**
-   * PASSO 1: Inicia o processo de renegociação
-   */
   async iniciarRenegociacao(idsBoletos: string[]): Promise<RenegociacaoIniciada> {
     try {
       const response = await this.client.post<RenegociacaoIniciada>('/renegociar_selecionados', {
         get_id: idsBoletos.join(',')
       });
-      console.log(`✅ Renegociação iniciada: ID ${response.data.id_renegociacao}`);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao iniciar renegociação:', error.response?.data || error.message);
@@ -140,78 +129,46 @@ export class IxcService {
     }
   }
 
-  /**
-   * PASSO 2: Atualiza dados da renegociação
-   */
   async atualizarRenegociacao(
-  idRenegociacao: number,
-  dados: DadosRenegociacao
-): Promise<RenegociacaoAtualizada> {
-  try {
-    // Monta o payload com todos os campos para atualização
-    const dadosAtualizacao: DadosRenegociacao = {
-      id_filial: '1',
-      id_conta: '286',
-      id_cliente: dados.id_cliente,
-      data_emissao: this.normalizarData(dados.data_emissao),
-      previsao: 'S',
-      id_carteira_cobranca: '3',
-      id_condicao_pagamento: '1',
-      vendedor_renegociacao: '',
-      contrato_renegociacao: dados.contrato_renegociacao,
-      data_vencimento: this.normalizarData(dados.data_vencimento),
-      valor_parcelas: dados.valor_total,
-      valor_acrescimos: '0,00',
-      valor_descontos: '0,00',
-      valor_total: dados.valor_total,
-      valor_renegociado: dados.valor_total,
-      acre_juros_multa: '',
-      valor_total_pagar: dados.valor_total,
-      status: dados.status || 'A', // Garante que o status seja sempre 'A' (ativo)
-      data_finalizada: '', // Atualiza com a data atual no formato DD/MM/YYYY
-      finalizar: 'N',
-    };
+    idRenegociacao: number,
+    dados: DadosRenegociacao
+  ): Promise<RenegociacaoAtualizada> {
+    try {
+      const dadosAtualizacao: DadosRenegociacao = {
+        id_filial: '1',
+        id_conta: '286',
+        id_cliente: dados.id_cliente,
+        data_emissao: this.normalizarData(dados.data_emissao),
+        previsao: 'S',
+        id_carteira_cobranca: '3',
+        id_condicao_pagamento: '1',
+        vendedor_renegociacao: '',
+        contrato_renegociacao: dados.contrato_renegociacao,
+        data_vencimento: this.normalizarData(dados.data_vencimento),
+        valor_parcelas: dados.valor_total,
+        valor_acrescimos: '0,00',
+        valor_descontos: '0,00',
+        valor_total: dados.valor_total,
+        valor_renegociado: dados.valor_total,
+        acre_juros_multa: '',
+        valor_total_pagar: dados.valor_total,
+        status: dados.status || 'A',
+        data_finalizada: '',
+        finalizar: 'N',
+      };
 
-    console.log(`   📋 Atualizando renegociação ${idRenegociacao} com:`, {
-      id_filial: dadosAtualizacao.id_filial,
-      id_conta: dadosAtualizacao.id_conta,
-      id_cliente: dadosAtualizacao.id_cliente,
-      data_emissao: dadosAtualizacao.data_emissao,
-      previsao: dadosAtualizacao.previsao,
-      id_carteira_cobranca: dadosAtualizacao.id_carteira_cobranca,
-      id_condicao_pagamento: dadosAtualizacao.id_condicao_pagamento,
-      vendedor_renegociacao: dadosAtualizacao.vendedor_renegociacao,
-      contrato_renegociacao: dadosAtualizacao.contrato_renegociacao,
-      data_vencimento: dadosAtualizacao.data_vencimento,
-      valor_parcelas: dadosAtualizacao.valor_parcelas,
-      valor_acrescimos: dadosAtualizacao.valor_acrescimos,
-      valor_descontos: dadosAtualizacao.valor_descontos,
-      valor_total: dadosAtualizacao.valor_total,
-      valor_renegociado: dadosAtualizacao.valor_renegociado,
-      acre_juros_multa: dadosAtualizacao.acre_juros_multa,
-      valor_total_pagar: dadosAtualizacao.valor_total_pagar,
-      status: dadosAtualizacao.status,
-      data_finalizada: dadosAtualizacao.data_finalizada,
-      finalizar: dadosAtualizacao.finalizar,
-    });
+      const response = await this.client.put<RenegociacaoAtualizada>(
+        `/fn_renegociacao_wiz/${idRenegociacao}`,
+        dadosAtualizacao
+      );
 
-    const response = await this.client.put<RenegociacaoAtualizada>(
-      `/fn_renegociacao_wiz/${idRenegociacao}`,
-      dadosAtualizacao
-    );
-
-    console.log(`✅ Renegociação ${idRenegociacao} atualizada`);
-    return response.data;
-  } catch (error: any) {
-    console.error('Erro ao atualizar renegociação:', error.response?.data || error.message);
-    throw error;
+      return response.data;
+    } catch (error: any) {
+      console.error('Erro ao atualizar renegociação:', error.response?.data || error.message);
+      throw error;
+    }
   }
-}
 
-
-  /**
-   * PASSO 3: Calcula juros e multa
-   */
   async calcularJurosMulta(
     idCarteiraCobranca: string,
     idCondicaoPagamento: string,
@@ -223,7 +180,6 @@ export class IxcService {
         id_condicao_pagamento: idCondicaoPagamento,
         id: idRenegociacao.toString()
       });
-      console.log(`✅ Juros/Multa calculados: ${response.data.totalFineAndFess}`);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao calcular juros/multa:', error.response?.data || error.message);
@@ -231,16 +187,11 @@ export class IxcService {
     }
   }
 
-  /**
-   * PASSO 4: Finaliza a renegociação
-   * IMPORTANTE: Envia TODOS os dados novamente com finalizar='S' e data_finalizada
-   */
   async finalizarRenegociacao(
     idRenegociacao: number,
     dados: DadosRenegociacao
   ): Promise<RenegociacaoAtualizada> {
     try {
-      // Monta o payload completo com TODOS os campos para finalização
       const dadosFinalizacao: DadosRenegociacao = {
         id_filial: '1',
         id_conta: '286',
@@ -260,22 +211,15 @@ export class IxcService {
         acre_juros_multa: dados.acre_juros_multa || '',
         valor_total_pagar: dados.valor_total_pagar,
         status: 'A',
-        data_finalizada: this.formatarData(new Date()), // ✅ DATA ATUAL DD/MM/YYYY
-        finalizar: 'S' // ✅ FINALIZAR = S
+        data_finalizada: this.formatarData(new Date()),
+        finalizar: 'S'
       };
 
-      console.log(`   📋 Finalizando com:`, {
-        data_finalizada: dadosFinalizacao.data_finalizada,
-        finalizar: dadosFinalizacao.finalizar,
-        data_vencimento: dadosFinalizacao.data_vencimento
-      });
-      
       const response = await this.client.put<RenegociacaoAtualizada>(
         `/fn_renegociacao_wiz/${idRenegociacao}`,
         dadosFinalizacao
       );
       
-      console.log(`✅ Renegociação ${idRenegociacao} finalizada`);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao finalizar renegociação:', error.response?.data || error.message);
@@ -283,20 +227,13 @@ export class IxcService {
     }
   }
 
-  /**
-   * PASSO 5: Busca o boleto gerado pela renegociação
-   * O IXC demora alguns ms para criar o boleto, então fazemos retry
-   */
   async buscarBoletoRenegociado(
     idRenegociacao: number,
     tentativas = 8,
     delayMs = 2000
   ): Promise<Boleto> {
-    console.log(`   🔍 Buscando boleto da renegociação ${idRenegociacao}...`);
-    
     for (let i = 1; i <= tentativas; i++) {
       try {
-        // Tenta buscar por id_renegociacao
         const response = await this.client.post<BoletosPaginados>('/fn_areceber', {
           qtype: 'fn_areceber.status',
           query: 'A',
@@ -312,18 +249,14 @@ export class IxcService {
         const boletos = response.data.registros || [];
         
         if (boletos.length > 0) {
-          // Pega o boleto mais recente (com status A - aberto)
           const boletoNovo = boletos.find(b => b.status === 'A');
           if (boletoNovo) {
-            console.log(`   ✅ Boleto encontrado: ${boletoNovo.id} (tentativa ${i}/${tentativas})`);
             return boletoNovo;
           }
         }
 
-        console.log(`   ⏳ Aguardando criação do boleto... (${i}/${tentativas})`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       } catch (error: any) {
-        console.error(`   ⚠️  Tentativa ${i} falhou:`, error.message);
         if (i === tentativas) throw error;
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
@@ -332,17 +265,12 @@ export class IxcService {
     throw new Error(`Boleto da renegociação ${idRenegociacao} não foi encontrado após ${tentativas} tentativas`);
   }
 
-  /**
-   * PASSO 6: Corrige a data de vencimento do boleto (workaround para bug da API)
-   * IMPORTANTE: Datas devem estar no formato DD/MM/YYYY
-   */
   async corrigirDataVencimento(
     idBoleto: string,
     boletoRenegociado: Boleto,
     novaDataVencimento: string
   ): Promise<any> {
     try {
-      // Garante que as datas estão no formato DD/MM/YYYY
       const dataVencimentoFormatada = novaDataVencimento.includes('-') 
         ? this.formatarData(this.parseData(novaDataVencimento))
         : novaDataVencimento;
@@ -372,8 +300,7 @@ export class IxcService {
         id_remessa_alteracao: '',
         motivo_alteracao: ''
       });
-      
-      console.log(`✅ Data de vencimento corrigida para ${dataVencimentoFormatada}`);
+
       return response.data;
     } catch (error: any) {
       console.error('Erro ao corrigir data de vencimento:', error.response?.data || error.message);
@@ -381,9 +308,6 @@ export class IxcService {
     }
   }
 
-  /**
-   * PASSO 7: Gera o boleto em base64
-   */
   async gerarBoleto(idBoleto: string): Promise<any> {
     try {
       const response = await this.client.post('/get_boleto', {
@@ -395,7 +319,6 @@ export class IxcService {
         base64: 'S',
         layout_impressao: ''
       });
-      console.log(`✅ Boleto gerado em base64`);
       return response.data;
     } catch (error: any) {
       console.error('Erro ao gerar boleto:', error.response?.data || error.message);
@@ -417,7 +340,6 @@ export class IxcService {
 
     const limpa = dataString.trim();
 
-    // DD/MM/AAAA
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(limpa)) {
       const [dia, mes, ano] = limpa.split('/');
       return new Date(
@@ -427,7 +349,6 @@ export class IxcService {
       );
     }
 
-    // YYYY-MM-DD ou YYYY-MM-DD HH:mm:ss
     if (/^\d{4}-\d{2}-\d{2}/.test(limpa)) {
       const [data] = limpa.split(' ');
       const [ano, mes, dia] = data.split('-');

@@ -15,26 +15,17 @@ export class RenegociacaoService {
    * Processa todos os boletos pagos na data especificada
    */
   async processarBoletosPagos(data: string): Promise<ResultadoProcessamento[]> {
-    console.log(`\n🔍 Iniciando processamento de boletos pagos em ${data}...`);
-    
     const boletos = await this.ixcService.buscarBoletosPagosNaData(data);
-    console.log(`📋 Encontrados ${boletos.length} boleto(s) pago(s).\n`);
 
     const resultados: ResultadoProcessamento[] = [];
 
     for (const boletoPago of boletos) {
       try {
-        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-        console.log(`🔎 Analisando boleto pago: ${boletoPago.id}`);
-        console.log(`   Vencimento: ${boletoPago.data_vencimento}`);
-        console.log(`   Valor: R$ ${boletoPago.valor}`);
-        
         const resultado = await this.analisarERenegociar(boletoPago);
         if (resultado) {
           resultados.push(resultado);
         }
       } catch (error: any) {
-        console.error(`❌ Erro ao processar boleto ${boletoPago.id}:`, error.message);
         resultados.push({
           sucesso: false,
           boletoPago: boletoPago.id,
@@ -54,36 +45,25 @@ export class RenegociacaoService {
     const idContratoAvulso = boletoPago.id_contrato_avulso;
 
     if (!idContrato && !idContratoAvulso) {
-      console.log(`⚠️  Boleto ${boletoPago.id} não possui contrato vinculado.`);
       return null;
     }
 
     // Busca todos os boletos em aberto do contrato
-    console.log(`   Buscando boletos do contrato...`);
     const boletosContrato = await this.ixcService.buscarBoletosPorContrato(
       idContrato,
       idContratoAvulso
     );
 
     if (boletosContrato.length === 0) {
-      console.log(`✅ Nenhum boleto em aberto no contrato. Tudo certo!`);
       return null;
     }
-
-    console.log(`   Encontrados ${boletosContrato.length} boleto(s) em aberto.`);
 
     // Analisa o cenário
     const cenario = this.identificarCenario(boletoPago, boletosContrato);
     
     if (!cenario.necessitaRenegociacao) {
-      console.log(`✅ ${cenario.motivo}`);
       return null;
     }
-
-    console.log(`\n🔄 RENEGOCIAÇÃO NECESSÁRIA!`);
-    console.log(`   Cenário: ${cenario.tipo}`);
-    console.log(`   Boleto a renegociar: ${cenario.boletoRenegociar!.id}`);
-    console.log(`   Nova data: ${cenario.novaDataVencimento}`);
 
     // Executa a renegociação
     const resultado = await this.executarRenegociacao(
@@ -125,12 +105,6 @@ export class RenegociacaoService {
       };
     }
 
-    console.log(`   📊 Comparando datas:`);
-    console.log(`      Boleto pago: ${boletoPago.data_vencimento}`);
-    boletosOrdenados.forEach(b => {
-      console.log(`      Boleto em aberto: ${b.id} - Vencimento: ${b.data_vencimento}`);
-    });
-
     // CENÁRIO 2: Pagou um boleto no mês vigente (não vencido) e há um vencido do mês anterior
     const now = new Date();
     const boletoPagoNoMesVigente =
@@ -146,15 +120,8 @@ export class RenegociacaoService {
       const boletoVencidoMaisAntigo = boletosVencidosAnteriores[0];
 
       // Nova data: último dia do MÊS do boleto PAGO (não do mês atual!)
-      // Se pagou em 05/02, renegocia para 28/02 (último dia de fevereiro)
       const ultimoDiaMesDoBoletoPago = endOfMonth(dataVencimentoPago);
       const novaDataVencimento = this.ixcService.formatarData(ultimoDiaMesDoBoletoPago);
-
-      console.log(`   🎯 CENÁRIO IDENTIFICADO: Pagamento no mês vigente, mas existe boleto vencido do mês anterior`);
-      console.log(`      Pago: ${boletoPago.data_vencimento} (${boletoPago.id})`);
-      console.log(`      Vencido anterior: ${boletoVencidoMaisAntigo.data_vencimento} (${boletoVencidoMaisAntigo.id})`);
-      
-      console.log(`   📅 Nova data de vencimento calculada: ${novaDataVencimento}`);
       
       return {
         necessitaRenegociacao: true,
@@ -166,15 +133,10 @@ export class RenegociacaoService {
     }
 
     // CENÁRIO 1: Pagou um boleto POSTERIOR quando existe um ANTERIOR em aberto
-    // (aplicado apenas quando não caiu no cenário 2 acima)
     const boletoMaisAntigo = boletosOrdenados[0];
     const dataVencimentoMaisAntigo = this.ixcService.parseData(boletoMaisAntigo.data_vencimento);
 
     if (dataVencimentoPago > dataVencimentoMaisAntigo) {
-      console.log(`   🎯 CENÁRIO IDENTIFICADO: Pagou boleto posterior`);
-      console.log(`      Pago: ${boletoPago.data_vencimento} (${boletoPago.id})`);
-      console.log(`      Em aberto anterior: ${boletoMaisAntigo.data_vencimento} (${boletoMaisAntigo.id})`);
-      
       return {
         necessitaRenegociacao: true,
         tipo: 'PAGOU_PROXIMO_MES',
@@ -197,17 +159,11 @@ export class RenegociacaoService {
     boletoOriginal: Boleto,
     novaDataVencimento: string
   ): Promise<ResultadoRenegociacao> {
-    console.log(`\n╔════════════════════════════════════════════════╗`);
-    console.log(`║  INICIANDO RENEGOCIAÇÃO - Boleto ${boletoOriginal.id.padEnd(10)} ║`);
-    console.log(`╚════════════════════════════════════════════════╝\n`);
-
     // PASSO 1: Inicia renegociação
-    console.log(`[1/7] 🚀 Iniciando renegociação...`);
     const renegociacaoIniciada = await this.ixcService.iniciarRenegociacao([boletoOriginal.id]);
     const idRenegociacao = renegociacaoIniciada.id_renegociacao;
 
     // PASSO 2: Prepara dados da renegociação
-    console.log(`[2/7] 📝 Preparando dados da renegociação...`);
     const dadosRenegociacao: DadosRenegociacao = {
       id_filial: boletoOriginal.id_filial,
       id_conta: boletoOriginal.id_conta,
@@ -231,7 +187,6 @@ export class RenegociacaoService {
     await this.ixcService.atualizarRenegociacao(idRenegociacao, dadosRenegociacao);
 
     // PASSO 3: Calcula juros e multa
-    console.log(`[3/7] 💰 Calculando juros e multa...`);
     const jurosMulta = await this.ixcService.calcularJurosMulta(
       boletoOriginal.id_carteira_cobranca,
       boletoOriginal.id_condicao_pagamento,
@@ -240,7 +195,6 @@ export class RenegociacaoService {
 
     // Se houver juros/multa, atualiza os valores
     if (jurosMulta.totalFineAndFess && jurosMulta.totalFineAndFess !== '0,00') {
-      console.log(`   ⚠️  Juros/Multa aplicados: R$ ${jurosMulta.totalFineAndFess}`);
       const valorTotalComJuros = this.somarValores(
         boletoOriginal.valor,
         jurosMulta.totalFineAndFess
@@ -251,23 +205,18 @@ export class RenegociacaoService {
       dadosRenegociacao.valor_total = valorTotalComJuros;
       dadosRenegociacao.valor_renegociado = valorTotalComJuros;
       dadosRenegociacao.valor_total_pagar = valorTotalComJuros;
-    } else {
-      console.log(`   ✅ Sem juros/multa a aplicar`);
     }
 
     // PASSO 4: Finaliza renegociação
-    console.log(`[4/7] ✔️  Finalizando renegociação...`);
     await this.ixcService.finalizarRenegociacao(idRenegociacao, dadosRenegociacao);
 
     // PASSO 5: Busca o boleto gerado pela renegociação
-    console.log(`[5/7] 🔍 Buscando boleto gerado...`);
     let boletoRenegociado: Boleto;
     
     try {
       boletoRenegociado = await this.ixcService.buscarBoletoRenegociado(idRenegociacao);
     } catch (error) {
       // Plano B: Busca o boleto mais recente do contrato
-      console.log(`   ⚠️  Usando método alternativo: buscando último boleto do contrato...`);
       const boletosContrato = await this.ixcService.buscarBoletosPorContrato(
         boletoOriginal.id_contrato,
         boletoOriginal.id_contrato_avulso
@@ -283,11 +232,9 @@ export class RenegociacaoService {
       }
       
       boletoRenegociado = boletosOrdenados[0];
-      console.log(`   ✅ Boleto encontrado via método alternativo: ${boletoRenegociado.id}`);
     }
 
     // PASSO 6: Corrige a data de vencimento (workaround para bug da API)
-    console.log(`[6/7] 🔧 Corrigindo data de vencimento (bug IXC)...`);
     await this.ixcService.corrigirDataVencimento(
       boletoRenegociado.id,
       boletoOriginal,
@@ -295,17 +242,7 @@ export class RenegociacaoService {
     );
 
     // PASSO 7: Gera o boleto em base64
-    console.log(`[7/7] 📄 Gerando boleto em PDF...`);
     const boletoBase64 = await this.ixcService.gerarBoleto(boletoRenegociado.id);
-
-    console.log(`\n╔════════════════════════════════════════════════╗`);
-    console.log(`║  ✅ RENEGOCIAÇÃO CONCLUÍDA COM SUCESSO!       ║`);
-    console.log(`╚════════════════════════════════════════════════╝`);
-    console.log(`   ID Renegociação: ${idRenegociacao}`);
-    console.log(`   Boleto Original: ${boletoOriginal.id}`);
-    console.log(`   Boleto Novo: ${boletoRenegociado.id}`);
-    console.log(`   Nova Data: ${novaDataVencimento}`);
-    console.log(`   Valor Total: R$ ${dadosRenegociacao.valor_total_pagar}\n`);
 
     return {
       idRenegociacao,
