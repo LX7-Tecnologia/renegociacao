@@ -1,5 +1,6 @@
 # Dependencies
-node_modules/x
+node_modules/
+
 
 # Build output
 dist/
