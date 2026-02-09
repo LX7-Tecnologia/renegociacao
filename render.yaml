@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: renegociacao
+    name: renegociacao-boletos-ixc
     runtime: node
-    buildCommand: pnpm build
+    buildCommand: pnpm install && pnpm build
     startCommand: pnpm run start
     envVars:
       - key: IXC_BASE_URL
